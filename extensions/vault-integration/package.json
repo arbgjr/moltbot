@@ -1,0 +1,29 @@
+{
+  "name": "@openclaw/vault-integration",
+  "version": "2026.1.30",
+  "type": "module",
+  "description": "HashiCorp Vault integration for OpenClaw secret management",
+  "keywords": [
+    "vault",
+    "hashicorp",
+    "secrets",
+    "credentials",
+    "security"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,15 @@
+{
+  "id": "vault-integration",
+  "name": "Vault Integration",
+  "description": "Store OpenClaw credentials in HashiCorp Vault for centralized secret management",
+  "version": "2026.1.30",
+  "author": "OpenClaw Contributors",
+  "requires": {
+    "openclaw": ">=2026.1.0"
+  },
+  "permissions": {
+    "credentials": "read-write",
+    "config": "read",
+    "network": "vault-api"
+  }
+}
