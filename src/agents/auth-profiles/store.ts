@@ -7,6 +7,11 @@ import { AUTH_STORE_LOCK_OPTIONS, AUTH_STORE_VERSION, log } from "./constants.js
 import { syncExternalCliCredentials } from "./external-cli-sync.js";
 import { ensureAuthStoreFile, resolveAuthStorePath, resolveLegacyAuthStorePath } from "./paths.js";
 import type { AuthProfileCredential, AuthProfileStore, ProfileUsageStats } from "./types.js";
+import {
+  getVaultAuthProfilesFromCache,
+  isVaultAvailable,
+  saveAuthProfilesToVault,
+} from "./vault-integration.js";
 
 type LegacyAuthStore = Record<string, AuthProfileCredential>;
 
@@ -163,6 +168,25 @@ function mergeOAuthFileIntoStore(store: AuthProfileStore): boolean {
 }
 
 export function loadAuthProfileStore(): AuthProfileStore {
+  // Try to load from Vault cache first if available
+  if (isVaultAvailable()) {
+    const vaultStore = getVaultAuthProfilesFromCache();
+    if (vaultStore) {
+      log.debug("vault integration: using auth-profiles from Vault cache");
+      // Sync from external CLI tools
+      const synced = syncExternalCliCredentials(vaultStore);
+      if (synced) {
+        // Save back to local file and Vault in background
+        const authPath = resolveAuthStorePath();
+        saveJsonFile(authPath, vaultStore);
+        saveAuthProfilesToVault(vaultStore).catch((error) => {
+          log.warn("vault integration: failed to sync back to Vault", { error });
+        });
+      }
+      return vaultStore;
+    }
+  }
+
   const authPath = resolveAuthStorePath();
   const raw = loadJsonFile(authPath);
   const asStore = coerceAuthStore(raw);
@@ -345,4 +369,11 @@ export function saveAuthProfileStore(store: AuthProfileStore, agentDir?: string)
     usageStats: store.usageStats ?? undefined,
   } satisfies AuthProfileStore;
   saveJsonFile(authPath, payload);
+
+  // Also save to Vault if available (async, non-blocking)
+  if (isVaultAvailable()) {
+    saveAuthProfilesToVault(payload).catch((error) => {
+      log.warn("vault integration: failed to save auth-profiles to Vault", { error });
+    });
+  }
 }

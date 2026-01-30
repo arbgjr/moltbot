@@ -91,11 +91,39 @@ export function createVaultIntegrationService(): OpenClawPluginService {
 
       // Export client to be used by other parts of OpenClaw
       // This would be used by credential providers
+      if (typeof globalThis !== "undefined") {
+        (globalThis as Record<string, unknown>)["__OPENCLAW_VAULT_CLIENT__"] = vaultClient;
+      }
+
       ctx.logger.info("vault-integration: ready");
+
+      // Warm the auth-profiles cache in background
+      // Import dynamically to avoid circular dependencies
+      try {
+        const { warmVaultAuthProfilesCache } = await import(
+          "../../../src/agents/auth-profiles/vault-integration.js"
+        );
+        await warmVaultAuthProfilesCache();
+      } catch (error) {
+        ctx.logger.warn("vault-integration: failed to warm auth-profiles cache", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
 
     async stop() {
+      if (typeof globalThis !== "undefined") {
+        (globalThis as Record<string, unknown>)["__OPENCLAW_VAULT_CLIENT__"] = null;
+      }
       vaultClient = null;
+    },
+
+    /**
+     * Get the active VaultClient instance.
+     * Used by auth-profiles integration.
+     */
+    getVaultClient(): VaultClient | null {
+      return vaultClient;
     },
   };
 }
