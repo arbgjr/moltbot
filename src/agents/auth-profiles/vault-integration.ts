@@ -31,6 +31,8 @@ export function isVaultAvailable(): boolean {
   return getVaultClient() !== null;
 }
 
+// Note: For KV v2, the path must include /data/ in the middle
+// Format: <mount>/data/<secret-path>
 const VAULT_AUTH_PROFILES_PATH = "openclaw/data/auth-profiles";
 
 // Cache for Vault-loaded profiles (warm cache approach)
@@ -44,24 +46,45 @@ let vaultCacheLoaded = false;
 export async function loadAuthProfilesFromVault(): Promise<AuthProfileStore | null> {
   const vaultClient = getVaultClient();
   if (!vaultClient) {
+    log.debug("vault integration: VaultClient not available");
     return null;
   }
 
   try {
+    log.debug("vault integration: reading from path", { path: VAULT_AUTH_PROFILES_PATH });
     const response = await vaultClient.read<AuthProfileStore>(VAULT_AUTH_PROFILES_PATH);
+
+    log.debug("vault integration: raw response", {
+      hasResponse: !!response,
+      hasData: !!response?.data,
+      dataKeys: response?.data ? Object.keys(response.data) : [],
+    });
+
     if (!response?.data) {
+      log.debug("vault integration: no response or no data in response");
       return null;
     }
 
     // Validate the structure
     const data = response.data;
-    if (!data || typeof data !== "object" || !data.profiles) {
+    if (!data || typeof data !== "object") {
+      log.debug("vault integration: data is not an object", { dataType: typeof data });
       return null;
     }
+
+    if (!data.profiles) {
+      log.debug("vault integration: no profiles in data", { dataKeys: Object.keys(data) });
+      return null;
+    }
+
+    log.debug("vault integration: successfully loaded auth-profiles", {
+      profileCount: Object.keys(data.profiles).length,
+    });
 
     return data as AuthProfileStore;
   } catch (error) {
     // Vault read failed, return null to trigger fallback
+    log.debug("vault integration: error reading from Vault", { error });
     return null;
   }
 }
